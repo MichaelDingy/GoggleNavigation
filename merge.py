@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+# DirectShow camera
 from camera import Camera
 
 class Marker():
@@ -10,6 +11,7 @@ class Marker():
         self.size = box[1]
         self.area = self.size[0] * self.size[1]
 
+        # difference between marker and ellipse
         self.diff = diff
     
     def __repr__(self):
@@ -157,7 +159,6 @@ def find_markers(img):
     """
         find all markers and return 
         markers: list of Marker object
-        bw: binary image
     """
 
     bw, contours = find_contours(img)
@@ -169,12 +170,12 @@ def find_markers(img):
             markers.append(Marker(diff, box))
 
     if len(markers) < 4:
-        return None, bw
+        return None
 
     # sort markers by its similarity to ellipse
     markers = sorted(markers, key=lambda x:x.diff)[:4]
 
-    return markers, bw
+    return markers
 
 def transform_img(img, src_points, dst_points):
     """warp perspective transformation."""
@@ -184,15 +185,15 @@ def transform_img(img, src_points, dst_points):
     transformed = cv2.warpPerspective(img, m, (w, h))
     return transformed
 
-def img_registration(src, dst, markers=None):
+def img_registration(src, dst, markers=None, display_fluorescence=False):
     """
         image registration between src image and dst image.
-        if markers is not None, then suppose the markers is fixed 
+        if markers is not None, then suppose the markers are fixed 
     """
 
     if not markers:
-        # src image process
-        markers, bw = find_markers(src)
+        # src image processing
+        markers = find_markers(src)
         if len(markers) is not 4:
             print 'cannot find 4 markers in source image'
             return dst
@@ -200,17 +201,22 @@ def img_registration(src, dst, markers=None):
     # sort markers to a specific order
     sort_markers(markers)
 
+    # if src is color image, convert it to binary image
     if src.ndim == 3:
         gray = cv2.cvtColor(src, cv2.COLOR_BGRA2GRAY)
         rval, bw = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV)
     else:
         bw = src
+
+    # get the region within markers
     roi = get_ROI(markers, bw)
+    if display_fluorescence:
+        cv2.imshow('fluorescence', roi)
 
     src_points = np.array(map(lambda x:map(int, x.center), markers), np.float32)
 
     # dst image process
-    markers, bw = find_markers(dst)
+    markers = find_markers(dst)
     if not markers:
         return dst
 
@@ -244,31 +250,43 @@ def video_registration():
 
     cv2.destroyAllWindows()
 
-def video_registration_fixed():
+#def video_registration(display_original=False, display_fluorescence=False):
+    #template = cv2.imread('template.jpg')
+    #src = template.copy()
 
-    template = cv2.imread('template.jpg')
-    src = template.copy()
+    #markers= find_markers(template)
+    #if len(markers) is not 4:
+        #print 'cannot find 4 markers in template image'
+        #return
 
-    markers, bw = find_markers(template)
-    if len(markers) is not 4:
-        print 'cannot find 4 markers in template image'
-        return
+    ## open cameras
+    #usb_cam = Camera(0)
+    #if not usb_cam.is_open():
+        #print 'cannot open usb camera'
+        #return
+    #fluo_cam = Camera(2)
+    #if not fluo_cam.is_open():
+        #print 'cannot open fluorescence camera'
+        #return
 
-    # open camera
-    cam = Camera(0)
-    if not cam.is_open():
-        return
+    #cv2.namedWindow('merged', cv2.CV_WINDOW_AUTOSIZE)
+    #if display_original:
+        #cv2.namedWindow('original', cv2.CV_WINDOW_AUTOSIZE)
+    #if display_fluorescence:
+        #cv2.namedWindow('fluorescence', cv2.CV_WINDOW_AUTOSIZE)
 
-    cv2.namedWindow('demo', cv2.CV_WINDOW_AUTOSIZE)
-    while True:
-        dst = cam.read()
-        merged = img_registration(src, dst, markers)
-        cv2.imshow('demo', merged)
-        key = cv2.waitKey(20)
-        if key == 27:
-            break
+    #while True:
+        #dst = usb_cam.read()
+        #src = fluo_cam.read()
+        #if display_original:
+            #cv2.imshow('original', dst)
+        #merged = img_registration(src, dst, markers, display_fluorescence)
+        #cv2.imshow('demo', merged)
+        #key = cv2.waitKey(20)
+        #if key == 27:
+            #break
 
-    cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    video_registration_fixed()
+    video_registration()

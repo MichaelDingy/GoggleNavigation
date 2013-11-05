@@ -1,5 +1,4 @@
 from VideoCapture import Device
-from PIL import Image
 import numpy as np
 
 class Camera():
@@ -7,7 +6,6 @@ class Camera():
         try:
             self.cam = Device(dev)
         except Exception as e: 
-            print e
             self.cam = None
     
     def is_open(self):
@@ -17,6 +15,9 @@ class Camera():
             return False
 
     def read(self):
+        if not self.cam.is_open():
+            raise IOError, 'camera is not open'
+
         frame = self.cam.getImage().convert('RGB')
         frame = np.array(frame)
         # Convert RGB to BGR 
@@ -27,11 +28,16 @@ def test():
     import cv2
 
     cam1 = Camera(0)
+    if not cam1.is_open():
+        print 'cannot open cam1'
+        return
     cam2 = Camera(1)
+    if not cam2.is_open():
+        print 'cannot open cam2'
+        return
 
     cv2.namedWindow('pc', cv2.WINDOW_AUTOSIZE)
     cv2.namedWindow('usb', cv2.WINDOW_AUTOSIZE)
-
     while True:
         img1 = cam1.read()
         img2 = cam2.read()
