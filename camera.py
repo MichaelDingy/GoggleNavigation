@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 
 class Camera():
-  #  def __init__(self, dev=0):
+    def __init__(self, dev=0):
         try:
             self.cam = Device(dev)
         except Exception as e: 
