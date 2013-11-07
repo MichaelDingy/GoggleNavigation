@@ -17,67 +17,67 @@ class Marker():
     def __repr__(self):
         return repr((self.center, self.area))
 
-def get_ROI(markers, img):
-    """
-        get region of interest (region with fluorescence) 
-        confined by four surrounding markers (x2, y2), (x3, y3), (x5, y5), (x4, y4).
-        2 * dis(p2 - p0) = dis(p4 - p0)
-        2 * dis(p3 - p1) = dis(p5 - p1)
+#def get_ROI(markers, img):
+    #"""
+        #get region of interest (region with fluorescence) 
+        #confined by four surrounding markers (x2, y2), (x3, y3), (x5, y5), (x4, y4).
+        #2 * dis(p2 - p0) = dis(p4 - p0)
+        #2 * dis(p3 - p1) = dis(p5 - p1)
 
-        (x2, y2) - - - - - - - - (x3, y3)
-           |        Region          |
-        (x0, y0) - - - - - - - - (x1, y1)
-           |          Of            |
-           |       Interest         |
-        (x4, y4) - - - - - - - - (x5, y5)
-    """
+        #(x2, y2) - - - - - - - - (x3, y3)
+           #|        Region          |
+        #(x0, y0) - - - - - - - - (x1, y1)
+           #|          Of            |
+           #|       Interest         |
+        #(x4, y4) - - - - - - - - (x5, y5)
+    #"""
 
-    h, w = img.shape[:2]
+    #h, w = img.shape[:2]
 
-    (x0, y0) = markers[0].center
-    (x1, y1) = markers[1].center
-    (x2, y2) = markers[2].center
-    (x3, y3) = markers[3].center
+    #(x0, y0) = markers[0].center
+    #(x1, y1) = markers[1].center
+    #(x2, y2) = markers[2].center
+    #(x3, y3) = markers[3].center
 
-    # extend the roi 
-    x4 = x0 + 2 * (x0 - x2)
-    y4 = y0 + 2 * (y0 - y2)
-    # when coordinates are out of range
-    if x4 > w:
-        x4 = w - 1
-    elif x4 < 0:
-        x4 = 0
-    if y4 > h:
-        y4 = h - 1
-    elif y4 < 0:
-        y4 = 0
-    x5 = x1 + 2 * (x1 - x3)
-    y5 = y1 + 2 * (y1 - y3)
-    if x5 > w:
-        x5 = w - 1
-    elif x5 < 0:
-        x5 = 0
-    if y5 > h:
-        y5 = h - 1
-    elif y5 < 0:
-        y5 = 0
+    ## extend the roi 
+    #x4 = x0 + 2 * (x0 - x2)
+    #y4 = y0 + 2 * (y0 - y2)
+    ## when coordinates are out of range
+    #if x4 > w:
+        #x4 = w - 1
+    #elif x4 < 0:
+        #x4 = 0
+    #if y4 > h:
+        #y4 = h - 1
+    #elif y4 < 0:
+        #y4 = 0
+    #x5 = x1 + 2 * (x1 - x3)
+    #y5 = y1 + 2 * (y1 - y3)
+    #if x5 > w:
+        #x5 = w - 1
+    #elif x5 < 0:
+        #x5 = 0
+    #if y5 > h:
+        #y5 = h - 1
+    #elif y5 < 0:
+        #y5 = 0
     
-    # floodfill four ellipse markers 
-    centers = [(x0, y0), (x1, y1), (x2, y2), (x3, y3)]
-    mask = np.zeros((h+2, w+2), np.uint8)
-    for center in centers:
-        cv2.floodFill(img, mask, center, 0)
+     ##floodfill four ellipse markers 
+    #centers = [(x0, y0), (x1, y1), (x2, y2), (x3, y3)]
+    #mask = np.zeros((h+2, w+2), np.uint8)
+    #for center in centers:
+        #cv2.floodFill(img, mask, center, 0)
 
-    # make mask with ROI filled with 1
-    mask = np.zeros((h, w), np.uint8)
-    convex_poly = np.array([[x2, y2], [x3, y3], [x5, y5], [x4, y4]])
-    cv2.fillConvexPoly(mask, convex_poly, 1)
+    ## make mask with ROI filled with 1
+    #mask = np.zeros((h, w), np.uint8)
+    #convex_poly = np.array([[x2, y2], [x3, y3], [x5, y5], [x4, y4]])
+    #cv2.fillConvexPoly(mask, convex_poly, 1)
 
-    roi = img * mask
+    #roi = img * mask
 
-    # maybe use pseudocolor
-    roi = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
-    return roi
+     ##maybe use pseudocolor
+    #roi = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
+    #return roi
 
 def normalize_blob(bw, center, size, angle, dsize):
     """
@@ -185,108 +185,119 @@ def transform_img(img, src_points, dst_points):
     transformed = cv2.warpPerspective(img, m, (w, h))
     return transformed
 
-def img_registration(src, dst, markers=None, display_fluorescence=False):
+def merge_img(src, mask):
     """
-        image registration between src image and dst image.
-        if markers is not None, then suppose the markers are fixed 
+        convert into color image;
+        apply mask (transformed fluorescence image) to color image;
+                (a,   b, b)
+            &   (0,   0, 0) where mask(I) != 0  =>   (0, 0, 0)
+            |   (0, 255, 0) where mask(I) != 0  =>   (0, 255, 0) green
+    """
+    src_color = cv2.cvtColor(src, cv2.COLOR_GRAY2BGR)
+    src_and = cv2.bitwise_and(src_color, np.zeros(src_color.shape, np.uint8), mask=mask)
+    green = np.zeros(src_color.shape, np.uint8)
+    cv2.fillConvexPoly(green, np.array([0, 0], [640, 0], [640, 480], [0, 480]), (0, 255, 0))
+    src_or = cv2.bitwise_or(src_and, green, mask=mask)
+    return src_or
+
+def img_registration(src, dst, markers):
+    """
+        image registration between src image and dst image, both of them must be grayscale;
+        markers are from template image.
     """
 
-    if not markers:
-        # src image processing
-        markers = find_markers(src)
-        if len(markers) is not 4:
-            print 'cannot find 4 markers in source image'
-            return dst
+    if src.ndim != 2 or dst.ndim != 2:
+        raise ValueError, 'image must be grayscale'
 
-    # sort markers to a specific order
+    ############################
+    # src image
     sort_markers(markers)
-
-    # if src is color image, convert it to binary image
-    if src.ndim == 3:
-        gray = cv2.cvtColor(src, cv2.COLOR_BGRA2GRAY)
-        rval, bw = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV)
-    else:
-        bw = src
-
-    # get the region within markers
-    roi = get_ROI(markers, bw)
-    if display_fluorescence:
-        cv2.imshow('fluorescence', roi)
-
     src_points = np.array(map(lambda x:map(int, x.center), markers), np.float32)
 
-    # dst image process
+    rval, src_bw = cv2.threshold(src, 100, 255, cv2.THRESH_BINARY_INV)
+    st = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    src_bw = cv2.morphologyEx(src_bw, cv2.MORPH_ERODE, st, iterations=1)
+
+    ############################
+    # dst image
     markers = find_markers(dst)
     if not markers:
-        return dst
+        return cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR)
 
     sort_markers(markers)
     dst_points = np.array(map(lambda x:map(int, x.center), markers), np.float32)
 
-    transformed = transform_img(roi, src_points, dst_points)
+    transformed_mask = transform_img(src_bw, src_points, dst_points)
 
-    # merge fluorescence image with camera color image
-    merged = cv2.add(transformed, dst)
+    # merge fluorescence image with camera image
+    merged = merge_img(dst, transfromed_mask)
     return merged
 
 def video_registration():
-    src = cv2.imread('template.jpg')
+    # open all accessible cameras
+    devices = []
+    for i in range(10):
+        cam = Camera(i)
+        if cam.is_open():
+            devices.append((i, cam.name))
+    
+    del cam
+    # fluorescence camera's name is MV...
+    fluo_cam = None
+    for i, cam_name in devices:
+        if cam_name.startswith('MV'):
+            fluo_cam = Camera(i)
+        else:
+            print i, cam_name
+    if not fluo_cam:
+        print 'cannot open fluorescence camera'
+        return
 
-    # open camera
-    cam = cv2.VideoCapture(0)
-    if cam.isOpened():
-        rval, frame = cam.read()
-    else:
-        rval = False
+    # select usb camera
+    while True:
+        try:
+            i = int(raw_input('Please selcet usb camera number: '))
+            break
+        except ValueError:
+            print 'input error'
+    usb_cam = Camera(i)
 
-    cv2.namedWindow('demo', cv2.CV_WINDOW_AUTOSIZE)
-    while rval:
-        rval, dst = cam.read()
-        merged = img_registration(src, dst)
-        cv2.imshow('demo', merged)
-        key = cv2.waitKey(20)
-        if key == 27:
+    cv2.namedWindow('merged', cv2.CV_WINDOW_AUTOSIZE)
+    cv2.namedWindow('fluorescence', cv2.CV_WINDOW_AUTOSIZE)
+   
+    # save template file
+    markers = []
+    while True:
+        template = fluo_cam.get_image(1)
+        cv2.imshow('fluorescence', template)
+        c = cv2.waitKey(30)
+        if c == ord('s'):
+            markers= find_markers(template)
+            if len(markers) is 4:
+                cv2.imwrite('template.jpg', template)
                 break
+        elif c == 27:
+            break
+
+    # read template image
+    template = cv2.imread('template.jpg')
+    markers = find_markers(template)
+    if len(markers) != 4:
+        print 'cannot find four markers'
+        return
+   
+    while True:
+        dst = usb_cam.get_image(1) 
+        src = fluo_cam.get_image(1)
+        
+        merged = img_registration(src, dst, markers, True)
+        
+        cv2.imshow('merged', merged)
+        key = cv2.waitKey(30)
+        if key == 27:
+            break
 
     cv2.destroyAllWindows()
-
-#def video_registration(display_original=False, display_fluorescence=False):
-    #template = cv2.imread('template.jpg')
-    #src = template.copy()
-
-    #markers= find_markers(template)
-    #if len(markers) is not 4:
-        #print 'cannot find 4 markers in template image'
-        #return
-
-    ## open cameras
-    #usb_cam = Camera(0)
-    #if not usb_cam.is_open():
-        #print 'cannot open usb camera'
-        #return
-    #fluo_cam = Camera(2)
-    #if not fluo_cam.is_open():
-        #print 'cannot open fluorescence camera'
-        #return
-
-    #cv2.namedWindow('merged', cv2.CV_WINDOW_AUTOSIZE)
-    #if display_original:
-        #cv2.namedWindow('original', cv2.CV_WINDOW_AUTOSIZE)
-    #if display_fluorescence:
-        #cv2.namedWindow('fluorescence', cv2.CV_WINDOW_AUTOSIZE)
-
-    #while True:
-        #dst = usb_cam.read()
-        #src = fluo_cam.read()
-        #if display_original:
-            #cv2.imshow('original', dst)
-        #merged = img_registration(src, dst, markers, display_fluorescence)
-        #cv2.imshow('demo', merged)
-        #key = cv2.waitKey(20)
-        #if key == 27:
-            #break
-
-    #cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     video_registration()
