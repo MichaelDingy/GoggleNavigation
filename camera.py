@@ -47,7 +47,7 @@ class Camera():
                 cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
 
             if height != 480:
-                r = 480.0 / 768
+                r = 480.0 / height
                 cv_img = cv2.resize(cv_img, (0, 0), fx=r, fy=r)
                 h, w = cv_img.shape[:2]
                 new_img = cv_img[:, (w - 640) / 2:(w - 640) / 2 + 640]
@@ -64,7 +64,7 @@ def test():
     cv2.namedWindow('camera', cv2.WINDOW_AUTOSIZE)
 
     while True:
-        img = cam.get_image(1)
+        img = cam.get_image(0)
         cv2.imshow('camera', img)
         c = cv2.waitKey(30)
         if c == ord('s'):
