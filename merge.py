@@ -177,10 +177,9 @@ def find_markers(img):
 
     return markers
 
-def transform_img(img, src_points, dst_points):
+def transform_img(img, src_points, dst_points, (h, w)):
     """warp perspective transformation."""
 
-    h, w = img.shape[:2]
     m = cv2.getPerspectiveTransform(src_points, dst_points)
     transformed = cv2.warpPerspective(img, m, (w, h))
     return transformed
@@ -193,10 +192,11 @@ def merge_img(src, mask):
             &   (0,   0, 0) where mask(I) != 0  =>   (0, 0, 0)
             |   (0, 255, 0) where mask(I) != 0  =>   (0, 255, 0) green
     """
+    h, w = src.shape
     src_color = cv2.cvtColor(src, cv2.COLOR_GRAY2BGR)
     src_and = cv2.bitwise_and(src_color, np.zeros(src_color.shape, np.uint8), mask=mask)
     green = np.zeros(src_color.shape, np.uint8)
-    cv2.fillConvexPoly(green, np.array([0, 0], [640, 0], [640, 480], [0, 480]), (0, 255, 0))
+    cv2.fillConvexPoly(green, np.array([0, 0], [w, 0], [w, h], [0, h]), (0, 255, 0))
     src_or = cv2.bitwise_or(src_and, green, mask=mask)
     return src_or
 
@@ -227,7 +227,8 @@ def img_registration(src, dst, markers):
     sort_markers(markers)
     dst_points = np.array(map(lambda x:map(int, x.center), markers), np.float32)
 
-    transformed_mask = transform_img(src_bw, src_points, dst_points)
+    dst_size = dst.shape
+    transformed_mask = transform_img(src_bw, src_points, dst_points, dst_size)
 
     # merge fluorescence image with camera image
     merged = merge_img(dst, transfromed_mask)
