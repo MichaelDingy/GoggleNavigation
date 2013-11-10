@@ -1,8 +1,7 @@
 import cv2
 import numpy as np
-
-# DirectShow camera
 from camera import Camera
+
 
 class Marker():
     def __init__(self, diff, box):
@@ -79,10 +78,10 @@ class Marker():
     #roi = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
     #return roi
 
+
 def normalize_blob(bw, center, size, angle, dsize):
-    """
-        straighten the rotateed ellipse blob, 
-        and resize it to the same size.
+    """straighten the rotateed ellipse blob, 
+    and resize it to the same size.
     """
 
     # rotate
@@ -96,10 +95,10 @@ def normalize_blob(bw, center, size, angle, dsize):
 
     return n_blob
 
+
 def is_marker(bw, contour, dsize=(50, 50)):
-    """
-        compare blob with standard ellipse,
-        and calculate the number of pixels with different value.
+    """compare blob with standard ellipse,
+    and calculate the number of pixels with different value.
     """
 
     # standard circle
@@ -116,13 +115,8 @@ def is_marker(bw, contour, dsize=(50, 50)):
 
     return diff, box
 
-def find_contours(img):
-    """
-        find all contours with area between 100 and 15000 in an image.
-        binarized: binary image
-        contours: contour list
-    """
 
+def find_contours(img):
     st = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     if img.ndim == 3:
         gray = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
@@ -133,15 +127,16 @@ def find_contours(img):
     contours, hierarchy = cv2.findContours(bw.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
     # only select contours with appropriate area
-    contours = filter(lambda x:100 < cv2.contourArea(x) and len(x) > 5, contours)
+    contours = filter(lambda x: 100 < cv2.contourArea(x) and len(x) > 5, contours)
 
     return bw, contours
+
 
 def sort_markers(markers):
     """sort four markers by area and coordinate."""
 
     # sort by area
-    markers.sort(key=lambda x:x.area)
+    markers.sort(key=lambda x: x.area)
     if markers[0].center[1] + markers[1].center[1] \
             > markers[2].center[1] + markers[3].center[1]:
         # big markers are above small ones
@@ -155,10 +150,10 @@ def sort_markers(markers):
         if markers[2].center[0] < markers[3].center[0]:
             markers[2], markers[3] = markers[3], markers[2]
 
+
 def find_markers(img):
-    """
-        find all markers and return 
-        markers: list of Marker object
+    """find all markers and return 
+    markers: list of Marker object.
     """
 
     bw, contours = find_contours(img)
@@ -173,9 +168,10 @@ def find_markers(img):
         return None
 
     # sort markers by its similarity to ellipse
-    markers = sorted(markers, key=lambda x:x.diff)[:4]
+    markers = sorted(markers, key=lambda x: x.diff)[:4]
 
     return markers
+
 
 def transform_img(img, src_points, dst_points, (h, w)):
     """warp perspective transformation."""
@@ -184,13 +180,13 @@ def transform_img(img, src_points, dst_points, (h, w)):
     transformed = cv2.warpPerspective(img, m, (w, h))
     return transformed
 
+
 def merge_img(src, mask):
-    """
-        convert into color image;
-        apply mask (transformed fluorescence image) to color image;
-                (a,   b, b)
-            &   (0,   0, 0) where mask(I) != 0  =>   (0, 0, 0)
-            |   (0, 255, 0) where mask(I) != 0  =>   (0, 255, 0) green
+    """convert into color image;
+    apply mask (transformed fluorescence image) to color image;
+            (a,   b, b)
+        &   (0,   0, 0) where mask(I) != 0  =>   (0, 0, 0)
+        |   (0, 255, 0) where mask(I) != 0  =>   (0, 255, 0) green
     """
     h, w = src.shape
     src_color = cv2.cvtColor(src, cv2.COLOR_GRAY2BGR)
@@ -200,19 +196,19 @@ def merge_img(src, mask):
     src_or = cv2.bitwise_or(src_and, green, mask=mask)
     return src_or
 
+
 def img_registration(src, dst, markers):
-    """
-        image registration between src image and dst image, both of them must be grayscale;
-        markers are from template image.
+    """image registration between src image and dst image, both of them must be grayscale;
+    markers are from template image.
     """
 
     if src.ndim != 2 or dst.ndim != 2:
-        raise ValueError, 'image must be grayscale'
+        raise ValueError('image must be grayscale')
 
     ############################
     # src image
     sort_markers(markers)
-    src_points = np.array(map(lambda x:map(int, x.center), markers), np.float32)
+    src_points = np.array(map(lambda x: map(int, x.center), markers), np.float32)
 
     rval, src_bw = cv2.threshold(src, 100, 255, cv2.THRESH_BINARY_INV)
     st = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -225,7 +221,7 @@ def img_registration(src, dst, markers):
         return cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR)
 
     sort_markers(markers)
-    dst_points = np.array(map(lambda x:map(int, x.center), markers), np.float32)
+    dst_points = np.array(map(lambda x: map(int, x.center), markers), np.float32)
 
     dst_size = dst.shape
     transformed_mask = transform_img(src_bw, src_points, dst_points, dst_size)
@@ -233,6 +229,7 @@ def img_registration(src, dst, markers):
     # merge fluorescence image with camera image
     merged = merge_img(dst, transfromed_mask)
     return merged
+
 
 def video_registration():
     # open all accessible cameras
@@ -273,8 +270,8 @@ def video_registration():
         cv2.imshow('fluorescence', template)
         c = cv2.waitKey(30)
         if c == ord('s'):
-            markers= find_markers(template)
-            if len(markers) is 4:
+            markers = find_markers(template)
+            if len(markers) == 4:
                 cv2.imwrite('template.jpg', template)
                 break
         elif c == 27:
@@ -299,6 +296,7 @@ def video_registration():
             break
 
     cv2.destroyAllWindows()
+
 
 if __name__ == '__main__':
     video_registration()

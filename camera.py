@@ -1,12 +1,12 @@
-import vidcap
 from PIL import Image
 import numpy as np
 import cv2
+import vidcap
+
 
 class Camera():
-    """
-        Camera device using DirectShow
-        depencency: VideoCapture http://videocapture.sourceforge.net/
+    """Camera device using DirectShow
+    depencency: VideoCapture http://videocapture.sourceforge.net/
     """
 
     def __init__(self, devnum=0):
@@ -27,20 +27,24 @@ class Camera():
         return self.dev.getbuffer()
     
     def get_image(self, mode=0):
-        """
-            get image from camera, 
-            in some cases, image size is not 640X480 and there exist black margins,
-            so we should resize and crop it.
-                mode: 0  color image
-                      1  grayscale iamge
+        """get image from camera 
+        in some cases, image size is not 640X480 and 
+        there exist black margins,
+        so we should resize and crop it.
+        return:
+            mode: 0  color image
+                  1  grayscale iamge
         """
 
         if not self.is_open():
-            raise IOError, 'camera is not open'
+            raise IOError('camera is not open')
 
         buffer, width, height = self._get_buffer()
         if buffer:
-            img = Image.fromstring('RGB', (width, height), buffer, 'raw', 'RGB', 0, -1)
+            img = Image.fromstring('RGB', 
+                                   (width, height),
+                                   buffer,
+                                   'raw', 'RGB', 0, -1)
             cv_img = np.array(img)
 
             if mode:
@@ -54,6 +58,7 @@ class Camera():
                 return new_img
             else:
                 return cv_img
+
 
 def test():
     cam = Camera(0)
