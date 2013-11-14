@@ -7,6 +7,12 @@ import vidcap
 class Camera():
     """Camera device using DirectShow
     depencency: VideoCapture http://videocapture.sourceforge.net/
+    Functions:
+        is_open()   
+        get_img(mode=0)
+            return cv2 image
+                mode: 0  color image
+                      1  grayscale iamge
     """
 
     def __init__(self, devnum=0):
@@ -31,9 +37,6 @@ class Camera():
         in some cases, image size is not 640X480 and 
         there exist black margins,
         so we should resize and crop it.
-        return:
-            mode: 0  color image
-                  1  grayscale iamge
         """
 
         if not self.is_open():
@@ -69,7 +72,7 @@ def test():
     cv2.namedWindow('camera', cv2.WINDOW_AUTOSIZE)
 
     while True:
-        img = cam.get_image(0)
+        img = cam.get_image(1)
         cv2.imshow('camera', img)
         c = cv2.waitKey(30)
         if c == ord('s'):
