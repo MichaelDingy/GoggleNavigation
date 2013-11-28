@@ -49,6 +49,7 @@ class WindowCapture:
 
     def _init_capture(self, hwnd): 
         self.hwnd = hwnd
+        win32gui.SetForegroundWindow(hwnd)
         self.wDc = win32gui.GetWindowDC(self.hwnd)
         self.dcObj = win32ui.CreateDCFromHandle(self.wDc)
         self.cDC = self.dcObj.CreateCompatibleDC()

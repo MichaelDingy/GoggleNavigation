@@ -1,116 +1,130 @@
 import socket   
 import time
 import StringIO
-import thread
+import threading
+import select
 from PIL import Image, ImageTk
 import Tkinter as tk
-import tkMessageBox
-
-import merge
 
 
-class SocketServer:
-    """SocketServer could receive video from Android phone or Googel Glass  
-    and send processed video to it.
-    Functions:
-        - connect(): connect to android phone
-            - send_message_to_all(): send PC ip to all addresses in local network
-            - recv_message(): receive message from phone
-        - recv_img(): receive a PIL image from phone, and we will get phone's IP address 
-        - send(img): open a thread to send a PIL image to the phone
-    Default port:
-        recv: 6000
-        send: 6001
-        """
+class GGServer:
+    def __init__(self):
+        self.send_port = 6001
+        self.recv_img_port = 6000
+        self.recv_message_port = 6002
+        self.status = True
+        self.connect_status = False
+        
+        # get wireless ip address when computer is connected to Ethernet  
+        # http://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
+        s = socket.socket()
+        s.connect(('ustc.edu.cn', 80))
+        self.host, port = s.getsockname()
+        s.close()
 
-    def __init__(self, recv_port=6000, send_port=6001):
-        self.send_port = send_port
-        self.recv_port = recv_port
-
-        self.server = socket.socket()  
-        host = socket.gethostname()
-        self.server.bind((host, self.recv_port))
-        # listen(1) will make video frames in disorder 
-        self.server.listen(50)
-
-    def connect(self):
-        self.send_message_to_all()
-        self.recv_message()
-
-    def send_message_to_all(self):
-        # start 255 threads to send PC ip
-        for i in range(255):
-            host = socket.gethostbyname(socket.gethostname())
-            address = (host.rpartition('.')[0] + '.' + str(i),
-                       self.send_port)
-            # without \n android phone won't get the address
-            message = host + '\n'
-            thread.start_new_thread(self.send_message_thread, 
-                                   (message, address))
-
-    def send_message_thread(self, message, address):
+    def send_message(self, message, address):
         try:
-            c = socket.create_connection(address, timeout=1)
-            c.send(message)
-            c.close()
+            s = socket.create_connection(address, timeout=1)
+            s.sendall(message)
+            s.close()
         except socket.error:
-            return
+            pass
 
     def recv_message(self):
-        c, address = self.server.accept()
-        c.close()
+        server = socket.socket()
+        server.bind((self.host, self.recv_message_port))
+        server.listen(5)
+
+        while self.status:
+            input_ready, _, _ = select.select([server], [], [], 0.01)
+            if input_ready:
+                client, address = server.accept()
+                message = client.recv(1024)
+                self.send_host = address[0]
+                client.close()
+                self.connect_status = True
+                break
+        server.close()
 
     def recv_img(self):
-        client, address = self.server.accept()
-        self.android_ip = address[0]
+        while self.status:
+            if not self.connect_status:
+                time.sleep(0.01)
+            else:
+                break
 
-        image_data = client.makefile('r+b')
-        buff = StringIO.StringIO()
-        for line in image_data:
-            buff.write(line)
+        server = socket.socket()
+        server.bind((self.host, self.recv_img_port))
+        server.listen(50)
 
-         #seek back to the beginning of the data
-        buff.seek(0)
-        img = Image.open(buff)
+        while self.status:
+            input_ready, _, _ = select.select([server], [], [], 0.005)
+            if input_ready:
+                client, address = server.accept()
+                # store image data in StringIO
+                image_data = client.makefile('r+b')
+                buff = StringIO.StringIO()
+                for line in image_data:
+                    buff.write(line)
+                # get PIL image from StringIO 
+                buff.seek(0)
+                img = Image.open(buff)
+                # close all
+                image_data.flush()
+                image_data.close()
+                client.close()
 
-        image_data.flush()
-        image_data.close()
-        client.close()
+                processed = self.process_img(img)
+                threading.Thread(target=self.send_img, args=(processed,)).start()
 
+        server.close()
+
+    def process_img(self, img):
         return img
 
     def send_img(self, img):
-        thread.start_new_thread(self._send_img_thread,
-                               (img, (self.android_ip, self.send_port)))
-        time.sleep(0.01)
+        try:
+            client = socket.create_connection((self.send_host, self.send_port), timeout=1)
+            buff = StringIO.StringIO()
+            img.save(buff, format='JPEG')
+            client.sendall(buff.getvalue())
+            client.close()
+        except socket.error:
+            return
 
-    def _send_img_thread(self, img, address):
-        client = socket.create_connection(address)
-        buff = StringIO.StringIO()
-        img.save(buff, format='JPEG')
-        client.sendall(buff.getvalue())
-        client.close()
+    def connect(self):
+        if self.connect_status:
+            return
+        # send to all addresses in local network
+        for i in range(255):
+            address = (self.host.rpartition('.')[0] + '.' + str(i),
+                       self.send_port)
+            # without \n android phone won't get the address
+            message = self.host + '\n'
+            threading.Thread(target=self.send_message,
+                             args=(message, address)).start()
+
+    def start(self):
+        threading.Thread(target=self.recv_message, args=()).start()
+        threading.Thread(target=self.recv_img, args=()).start()
+
+    def close(self):
+        self.status = False
 
 
-class ServerViewer(tk.Frame):
+class GGServerViewer(tk.Frame, GGServer):
     def __init__(self, parent=None):
         tk.Frame.__init__(self, parent)
+        self.init_GUI(parent)
 
-        self.src = Image.open('src.jpg')
-        self.template = Image.open('template.jpg')
+        GGServer.__init__(self)
+        self.start()
 
-        self.ss = SocketServer()
-
-        ##################################
-        ### Entry: IP
-        #self.ip_entry = tk.Entry(parent)
-        #self.ip_entry.insert(0, '192.168.1.108')
-        #self.ip_entry.grid(column=0, row=0)
-
+    def init_GUI(self, parent):
         ################################
         # Button: Start
         self.start_button = tk.Button(parent, text='Start', 
-                                      command=self.connect)
+                                      command=self.start_viewer)
         self.start_button.grid(column=0, row=0)
 
         ################################
@@ -127,32 +141,14 @@ class ServerViewer(tk.Frame):
         self.video_label.image = tk_gg_img
         self.video_label.grid(column=0, row=1, columnspan=2)
 
-    #def get_ip(self):
-        #text = self.ip_entry.get()
-        #try:
-            #ip = socket.inet_aton(text)
-            #self.android_ip = text
-            #return True
-        #except socket.error:
-            #tkMessageBox.showwarning('Error', 'IP Address Input Error')
-            #return False
-        
-    def connect(self):
-        self.ss.connect()
-        self.start()
+    def process_img(self, img):
+        tk_img = ImageTk.PhotoImage(img)
+        self.video_label.configure(image=tk_img)
+        self.video_label.image = tk_img
+        return img
 
-    def start(self):
-        img= self.ss.recv_img()
-
-        dst = merge.img_registration(self.src, img, self.template)
-        # reisze its width to 640
-        w, h = dst.size
-        h_resized = int(640.0 / w * h)
-        dst = dst.resize((640, h_resized))
-
-        self.update_label(dst)
-        self.ss.send_img(dst)
-        self.after(10, self.start)
+    def start_viewer(self):
+        self.connect()
 
     def update_label(self, img):
         tk_img = ImageTk.PhotoImage(img)
@@ -160,11 +156,13 @@ class ServerViewer(tk.Frame):
         self.video_label.image = tk_img
 
     def quit(self):
+        self.close()
+        time.sleep(0.5)
         self.master.destroy()
 
 
 if __name__ == '__main__':
     root = tk.Tk()
     root.wm_title('Google Glass Viewer')
-    sv = ServerViewer(root)
+    sv = GGServerViewer(root)
     sv.mainloop()

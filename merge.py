@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 from PIL import Image
+import time
+from window_capture import WindowCapture
 
 
 class Marker():
@@ -183,38 +185,45 @@ def transform_img(img, src_points, dst_points, (h, w)):
 
 
 def merge_img(dst, mask):
-    """convert into color image;
-    apply mask (transformed fluorescence image) to dst image;
+    """apply mask (transformed fluorescence image) to dst image;
+    mask must be a single channel image.
     """
-    h, w = dst.shape
+    if mask.ndim != 2:
+       raise TypeError('mask image must be single channel')
+       
+    h, w = dst.shape[:2]
+    channel = dst.ndim
     green = np.zeros((h, w, 3), np.uint8)
     cv2.fillConvexPoly(green, np.array([[0, 0], [w, 0], [w, h], [0, h]]), (0, 255, 0))
     green_mask = cv2.multiply(green, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))
 
     inv_mask = cv2.bitwise_not(mask)
-    dst_and = cv2.bitwise_and(dst, inv_mask)
-    dst_color = cv2.cvtColor(dst_and, cv2.COLOR_GRAY2BGR)
+    if channel == 3:
+        inv_mask = cv2.cvtColor(inv_mask, cv2.COLOR_GRAY2BGR)
+        dst_color = cv2.bitwise_and(dst, inv_mask)
+    if channel == 2:
+        dst_and = cv2.bitwise_and(dst, inv_mask)
+        dst_color = cv2.cvtColor(dst_and, cv2.COLOR_GRAY2BGR)
     merged = cv2.add(dst_color, green_mask)
     return merged
 
-def img_registration(src, dst, template, outputmode='PIL'):
+def img_registration(src, dst, template, outputmode='PIL', colormode='color'):
     """image registration between src image and dst image
     according to four markers in template image.
-    input images can be color or grayscale images, 'OpenCV' or 'PIL'
-    return a pseudo-color image with format either in 'OpenCV' or 'PIL' 
+    outputmode: PIL Image or OpenCV ndarray
+    colormode:  color or gray (pseudo-color)
     """
-    
+    if outputmode not in ['PIL', 'OpenCV']:
+        raise TypeError('outputmode error')
+    if colormode not in ['color', 'gray']:
+        raise TypeError('color input error')
+          
     if type(src) != np.array and 'PIL' in str(src):
         src = pil_cv(pil_img=src)
     if type(dst) != np.array and 'PIL' in str(dst):
         dst = pil_cv(pil_img=dst)
     if type(template) != np.array and 'PIL' in str(template):
         template = pil_cv(pil_img=template)
-
-    if src.ndim != 2:
-        src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
-    if dst.ndim != 2:
-        dst = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
 
     ############################################
 
@@ -226,38 +235,47 @@ def img_registration(src, dst, template, outputmode='PIL'):
     src_points = np.array(map(lambda x: map(int, x.center), markers), 
                          np.float32)
 
-    rval, src_bw = cv2.threshold(src, 0, 255, 
-                                cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # fixed threshold
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    rval, src_bw = cv2.threshold(src_gray, 200, 255, 
+                                cv2.THRESH_BINARY)
     st = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     src_bw = cv2.morphologyEx(src_bw, cv2.MORPH_ERODE, st, iterations=1)
 
     ############################################
-
+    
+    if colormode == 'gray' and dst.ndim != 2:
+        dst = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
+        
     markers = find_markers(dst)
     if markers:
         sort_markers(markers)
         dst_points = np.array(map(lambda x: map(int, x.center), markers), 
                              np.float32)
 
-        dst_size = dst.shape
+        h, w = dst.shape[:2]
         transformed_mask = transform_img(src_bw, src_points, 
-                                         dst_points, dst_size)
+                                         dst_points, (h, w))
 
         merged = merge_img(dst, transformed_mask)
+    elif colormode == 'color':
+        merged = dst
     else:
         merged = cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR)
 
     if outputmode == 'OpenCV':
         return merged
-    elif outputmode == 'PIL':
-        return pil_cv(cv_img=merged)
     else:
-        raise TypeError('outputmode error')
+        return pil_cv(cv_img=merged)
 
 def pil_cv(pil_img=None, cv_img=None):
     """convert  PIL Image <=> OpenCV Image."""
     if pil_img:
-        return np.array(pil_img)
+        cv_img = np.array(pil_img)
+        if cv_img.ndim == 3:
+            return cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        else:
+            return cv_img
     # elif cv_img: error
     elif cv_img != None:
         return Image.fromarray(cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB))
@@ -265,66 +283,32 @@ def pil_cv(pil_img=None, cv_img=None):
         raise TypeError('Please input an image')
 
 def video_registration():
-    """demo"""
+    usb_cam = cv2.VideoCapture(2)
+    #usb_cam.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 1280)
+    #usb_cam.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 720)
 
-    from camera import Camera
-
-    # get all accessible cameras' name
-    devices = []
-    for i in range(10):
-        cam = Camera(i)
-        if cam.is_open():
-            devices.append((i, cam.name))
-        del cam
-    
-    # fluorescence camera's name is MV...
-    fluo_cam = None
-    for i, cam_name in devices:
-        if cam_name.startswith('MV'):
-            fluo_cam = Camera(i)
-        else:
-            print i, cam_name
-    if not fluo_cam:
-        print 'cannot open fluorescence camera'
-        return
-
-    # select usb camera
-    while True:
-        try:
-            i = int(raw_input('Please selcet usb camera number: '))
+    wc = WindowCapture()
+    for idx, win in enumerate(wc.wins):
+        print win[1]
+        if 'AMCap' in win[1]:
+            wc.set_win(idx)
             break
-        except ValueError:
-            print 'input error'
-    usb_cam = Camera(i)
-
-    cv2.namedWindow('merged', cv2.CV_WINDOW_AUTOSIZE)
-    cv2.namedWindow('fluorescence', cv2.CV_WINDOW_AUTOSIZE)
-   
-    # save template file
-    markers = []
-    while True:
-        template = fluo_cam.get_image(1)
-        cv2.imshow('fluorescence', template)
-        c = cv2.waitKey(30)
-        if c == ord('s'):
-            markers = find_markers(template)
-            if len(markers) == 4:
-                cv2.imwrite('template.jpg', template)
-                break
-        elif c == 27:
-            break
+    else:
+        raise IOError('cannot find AMCap window')
+    # wc.select_win()
 
     # read template image
     template = cv2.imread('template.jpg')
    
+    cv2.namedWindow('merged', cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty('merged', cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
     while True:
-        dst = usb_cam.get_image(1) 
-        src = fluo_cam.get_image(1)
+        rval, dst = usb_cam.read()
+        src = wc.capture_window()
         
-        merged = img_registration(src, dst, template)
-        
+        merged = img_registration(src, dst, template, 'OpenCV', 'color')
         cv2.imshow('merged', merged)
-        key = cv2.waitKey(30)
+        key = cv2.waitKey(5)
         if key == 27:
             break
 
