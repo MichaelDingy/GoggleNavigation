@@ -1,23 +1,21 @@
 Goggle Glass Navigation System Guide
 ================
-a goggle navigation system for surgeries
 
-##Brief Introduction Google Glass Surgery Navigation System
-*This system is used as an portable navigation device to detect subcutaneous tumor with a visible form.
-*This system contains 4 major parts:
+* This is a head mounted navigation system for surgery to detect subcutaneous tumor with a visible form.
+* This system contains 4 major parts:
    * Google Glass
    * NIR camera
    * Operation Table with Mark
    * Processing Unit(Computer)
-*This system is based on video processing,wireless communication,ICG shadowgraph technic.
+* This system is based on video processing,wireless communication,ICG shadowgraph technic.
 
-##MaHua有哪些功能？
+##Navigation System has following fetures
 
-* 方便的`导入导出`功能
-    *  直接把一个markdown的文本文件拖放到当前这个页面就可以了
-    *  导出为一个html格式的文件，样式一点也不会丢失
-* 编辑和预览`同步滚动`，所见即所得（右上角设置）
-* `VIM快捷键`支持，方便vim党们快速的操作 （右上角设置）
+* Portable and Simple Operation
+    *  Computer,Goggle glass and NIR camera are wireless conncected
+    *  You could open the application in glass as a phone
+* A Real-Time Dynamic Merged Image
+* 
 * 强大的`自定义CSS`功能，方便定制自己的展示
 * 有数量也有质量的`主题`,编辑器和预览区域
 * 完美兼容`Github`的markdown语法
