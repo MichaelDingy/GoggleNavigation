@@ -3,9 +3,13 @@ Goggle Glass Navigation System Guide
 a goggle navigation system for surgeries
 
 ##Brief Introduction Google Glass Surgery Navigation System
-一个在线编辑markdown文档的编辑器
-
-向Mac下优秀的markdown编辑器mou致敬
+*This system is used as an portable navigation device to detect subcutaneous tumor with a visible form.
+*This system contains 4 major parts:
+   * Google Glass
+   * NIR camera
+   * Operation Table with Mark
+   * Processing Unit(Computer)
+*This system is based on video processing,wireless communication,ICG shadowgraph technic.
 
 ##MaHua有哪些功能？
 
