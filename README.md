@@ -1,9 +1,8 @@
-GoggleNavigation
+Goggle Glass Navigation System Guide
 ================
-
 a goggle navigation system for surgeries
-![mahua](mahua-logo.jpg)
-##MaHua是什么?
+
+##Brief Introduction Google Glass Surgery Navigation System
 一个在线编辑markdown文档的编辑器
 
 向Mac下优秀的markdown编辑器mou致敬
