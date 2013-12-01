@@ -21,8 +21,9 @@ Goggle Glass Navigation System Guide
 ##Preparation
 Before use,you should ensure:
 * PC and Glass are connected within one WIFI network
+* Make a suitable mark for the Fluobeam
 * Fix the mark on the table then make sure the Fluobeam could 
-* then take a picture of it named as "template.jpg"
+* Take a picture of it named as "template.jpg"
 * 
 
 
